@@ -1,0 +1,97 @@
+// ================================================================
+// Prisma 스키마 파일 (DB 설계도)
+//
+// 비유: 이 파일은 "창고에 어떤 종류의 상자(테이블)를 두고,
+//       각 상자 안에는 어떤 칸(컬럼)이 있는지"를 정의하는 설계도예요.
+// 실제로 창고(DB)에 상자를 만들려면 아래 명령어를 실행합니다.
+//   npx prisma migrate dev --name init
+// (Supabase의 DATABASE_URL을 .env.local에 넣은 뒤 실행하세요)
+//
+// ※ 이 프로젝트는 Prisma 7 버전을 사용합니다. Prisma 7부터는
+//   접속 주소(url)를 이 파일이 아니라 "prisma.config.ts"에서 관리하고,
+//   PrismaClient도 생성 코드를 node_modules가 아닌 우리 프로젝트
+//   폴더(src/generated/prisma) 안에 직접 만들어냅니다.
+// ================================================================
+
+generator client {
+  provider = "prisma-client"          // Prisma 7의 신규 클라이언트 생성기(러스트 엔진 없이 동작)
+  output   = "../src/generated/prisma" // 생성된 코드가 저장될 위치 (node_modules 아님!)
+}
+
+datasource db {
+  provider = "postgresql" // Supabase는 PostgreSQL을 사용
+  // url은 여기 적지 않습니다. → prisma.config.ts 에서 관리합니다.
+}
+
+// ----------------------------------------------------------------
+// ① 시장 지표 스냅샷
+// S&P500, 나스닥100, VIX, 달러인덱스, 국채금리, 코스피/코스닥 등
+// "지금 이 순간의 값"을 주기적으로 저장해두는 테이블입니다.
+// 같은 지표(code)를 여러 시점(capturedAt)에 걸쳐 쌓아서
+// 나중에 "며칠간의 흐름" 그래프도 그릴 수 있어요.
+// ----------------------------------------------------------------
+model IndicatorSnapshot {
+  id         String   @id @default(cuid())
+  code       String   // 지표 코드. 예: "SP500", "NASDAQ100", "VIX", "KOSPI", "KOSDAQ", "DXY", "US10Y", "HY_SPREAD"
+  label      String   // 화면에 보여줄 이름. 예: "S&P 500"
+  value      Float    // 지표 값(지수 포인트, %, bp 등 지표마다 단위는 다름)
+  changePct  Float?   // 전일 대비 변동률(%). 없을 수도 있어서 물음표(선택값)
+  capturedAt DateTime @default(now()) // 이 값을 수집한 시각
+
+  @@index([code, capturedAt])
+}
+
+// ----------------------------------------------------------------
+// ② 계좌 스냅샷
+// "오늘 하루" 기준으로 내 계좌의 전체 상태를 한 줄로 요약해서 저장.
+// 매일 쌓이면 수익률 추이 그래프의 재료가 됩니다.
+// ----------------------------------------------------------------
+model AccountSnapshot {
+  id             String   @id @default(cuid())
+  date           DateTime @unique // 스냅샷 기준일 (하루에 1건)
+  principal      Float    // 투자원금 (내가 실제로 넣은 돈)
+  totalValue     Float    // 평가금액 (현재 보유 자산의 총 가치)
+  profitAmount   Float    // 수익금 = totalValue - principal
+  profitRatePct  Float    // 수익률(%) = profitAmount / principal * 100
+  createdAt      DateTime @default(now())
+}
+
+// ----------------------------------------------------------------
+// ③ 보유종목
+// 계좌 안에 지금 들고 있는 종목들. "가장 최신 상태"만 유지하는
+// 테이블이라, 매번 갱신할 때 upsert(있으면 수정, 없으면 추가)로 사용.
+// ----------------------------------------------------------------
+model Holding {
+  id            String   @id @default(cuid())
+  symbol        String   @unique // 종목코드. 예: "005930"(삼성전자), "AAPL"
+  name          String   // 종목명
+  quantity      Float    // 보유 수량
+  avgPrice      Float    // 평단가(평균 매수 단가)
+  currentPrice  Float    // 현재가
+  profitAmount  Float    // 평가손익 금액
+  profitRatePct Float    // 평가손익률(%)
+  updatedAt     DateTime @updatedAt
+}
+
+// ----------------------------------------------------------------
+// ④ 투자 후보 종목
+// 보조지표+수급+재무+뉴스를 종합해 점수를 매긴 결과.
+// horizon(투자기간)별로 단기/중기/장기 후보를 구분해서 저장합니다.
+// ----------------------------------------------------------------
+enum InvestmentHorizon {
+  SHORT  // 단기
+  MEDIUM // 중기
+  LONG   // 장기
+}
+
+model Candidate {
+  id          String            @id @default(cuid())
+  symbol      String            // 종목코드
+  name        String            // 종목명
+  horizon     InvestmentHorizon // 단기/중기/장기 분류
+  score       Float             // 종합 점수 (높을수록 유망하다고 판단)
+  reasons     Json              // 점수 산정 근거를 자유 형식으로 저장. 예: {"rsi": 32, "supply": "기관 3일 연속 순매수", "news": 5}
+  capturedAt  DateTime          @default(now()) // 이 후보 리스트가 계산된 시각
+
+  @@index([horizon, score])
+}
