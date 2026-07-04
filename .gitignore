@@ -1,0 +1,39 @@
+# 의존성 (node_modules는 어느 하위 폴더에 있든 전부 무시)
+node_modules/
+/.pnp
+.pnp.*
+
+# 빌드 결과물
+.next/
+out/
+build/
+dist/
+
+# 테스트/커버리지
+coverage/
+
+# 환경변수 (API 키 등 절대 커밋 금지)
+.env
+.env.*
+!.env.example
+
+# 로그
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS/에디터
+.DS_Store
+*.pem
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma (자동 생성 코드 - node_modules처럼 커밋 불필요)
+web/prisma/dev.db
+web/src/generated/prisma/
