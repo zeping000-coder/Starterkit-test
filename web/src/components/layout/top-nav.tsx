@@ -17,6 +17,9 @@ const NAV_ITEMS = [
   { href: "/", label: "시장 지표" },
   { href: "/account", label: "내 계좌" },
   { href: "/candidates", label: "투자 후보" },
+  { href: "/watchlist", label: "관심종목" },
+  { href: "/news", label: "뉴스" },
+  { href: "/portfolio-sim", label: "포트폴리오 시뮬레이션" },
 ];
 
 export function TopNav() {
